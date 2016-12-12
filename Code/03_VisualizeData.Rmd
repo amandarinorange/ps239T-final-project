@@ -1,0 +1,156 @@
+---
+title: "03_VisualizeData"
+author: "Amanda"
+date: "12/11/2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+First load all libraries/packages that will be necessary throughout this script
+```{r}
+require(dplyr)
+require(tidyr)
+require(ggplot2)
+library(gridExtra)
+require(stats)
+require(xlsx)
+require(Hmisc)
+```
+#Univariate Plots
+First, we will want to visualize the frequencies of each of the three different types of ratings with three separate histograms. It may be more useful to view this as a percentage of total traits (that is, out of 27). 
+```{r}
+#This plots a histogram for the percent of traits (total of 27) on which participants rated that the individual couple members are the SAME on a trait, but the couple is the opposite of what they are as individuals.
+emergence.perc <- 100*(full$emerg)/27 #calculate the percentage
+emergence.hist <- ggplot(full, aes(emergence.perc)) + 
+  geom_histogram(binwidth = 4,
+                 col="red",
+                 fill="red",
+                 alpha = .1)+
+  labs(title="Histogram of Couple-Level Trait \nDiffering From Individuals")+
+  labs(x="Percent of Traits for which \nCouple-Level Rating Differs From Individuals", y="Frequency")
+
+emergence.hist
+
+#This plots a histogram for the percent of traits (total of 27) on which participants rated that the individual couple members are opposites on a trait
+oppattract.perc <- 100*(full$oppo)/27 #calculate the percentage
+oppattract.hist <- ggplot(full, aes(oppattract.perc)) + 
+  geom_histogram(binwidth = 4,
+                 col="magenta",
+                 fill="pink",
+                 alpha = .1) +
+  labs(title="Histogram of 'Opposites Attract' Ratings")+
+  labs(x="Percent of Traits for which \nCouple Members are Rated as Opposites",
+y="Frequency")
+  
+oppattract.hist
+
+likattract.perc <- 100*(full$like)/27 #calculate the percentage
+likattract.hist <- ggplot(full, aes(likattract.perc)) + 
+  geom_histogram(binwidth = 4,
+                 col="dark green",
+                 fill="yellow",
+                 alpha = .2) +
+  labs(title="Histogram of 'Likes Attract' Ratings")+
+  labs(x="Percent of Traits for which \nCouple and Individuals are all Rated the Same",
+       y="Frequency")
+likattract.hist
+```
+
+Next, in order to compare the distributions of all three ratings types to one another, plot them on a single histogram. 
+```{r}
+overlaphist <- ggplot(full)+
+  geom_histogram(aes(x=emergence.perc),
+                 binwidth = 4,
+                 col="red",
+                 fill="red",
+                 alpha = .2) +
+  geom_histogram(aes(x=oppattract.perc),
+                 binwidth = 4,
+                 col="magenta",
+                 fill="pink",
+                 alpha = .2)+
+  geom_histogram(aes(x=likattract.perc),
+                 binwidth = 4,
+                 col="dark green",
+                 fill="yellow",
+                 alpha = .2)+
+  labs(title="Overlapping Frequences of 'Emergence', \n'Opposites Attract', and 'Likes Attract'")+
+  labs(x="Percent of Traits",
+       y="Frequency")+
+  theme(legend.position="right")+
+  theme(plot.title = element_text(size = 8, face = "bold"))+
+  scale_fill_discrete(
+    name = "frequency type", 
+    labels=c("Emergence", "Opposites Attract", "Likes Attract"))
+
+overlaphist
+```
+
+Addressing the key hypotheses, this plot of the bootstrapped 95% confidence intervals demonstrates that the frequency of emergence ratings is significantly non-zero. It also allows us to visualize how the frequencies of each of the three rating types compare to one another.  
+First create a subset of the data that contains the means of each ratings type, the lower bound of each CI, and the upper bound.
+```{r}
+d=data.frame(type=c("emergence","opposites","likes"), 
+             mean=c(mean(emergfreqs.boot),
+                    mean(oppattrfreqs.boot),
+                    mean(likattrfreqs.boot)), 
+             lower=c(quantile(emergfreqs.boot, 0.025), 
+                     quantile(oppattrfreqs.boot, 0.025), 
+                     quantile(likattrfreqs.boot, 0.025)), 
+             upper=c(quantile(emergfreqs.boot, 0.975), 
+                     quantile(oppattrfreqs.boot, 0.975), 
+                     quantile(likattrfreqs.boot, 0.975)))
+```
+#Write the confidence interval datafram to the results excel file for later reference
+```{r}
+write.xlsx(d, file="OthCoup_DragDrop_results.xlsx", sheetName="CIs", append=T)
+```
+
+Now plot the confidence intervals on a single graph.
+```{r}
+CIplot <- ggplot() + 
+  geom_errorbar(data=d, mapping=aes(x=type, ymin=upper, ymax=lower), width=0.2, size=.5, color="blue") + 
+  geom_point(data=d, mapping=aes(x=type, y=mean), size=1, shape=21, fill="white") +
+  scale_y_continuous(breaks = seq(0,27,5), limit = c(0, 27)) +
+  ggtitle("Confidence Intervals Based \non Bootstrap Resampling")+
+  theme(plot.title = element_text(size = 11, face = "bold"))+
+  labs(x="Rating Type",
+       y="Mean Frequency of Rating")
+
+CIplot
+```
+
+#Bivariate plots
+Visualizing gender differences in frequency of ratings for each of the three different types. Recall there were nonsignificant gender differences for the mean frequency of each different rating type, so this allows us to view the relative distributions between genders as well. 
+```{r}
+overlaphist.gen <- overlaphist + facet_grid((Gen ~ .))
+overlaphist.gen
+```
+
+Visualizing the relationship between IOS and frequency of emergence ratings. This was also a nonsignificant relationship.
+```{r}
+emergIOS.sctr <- ggplot(full, aes(x=coupIOS, y = emergence.perc)) +
+  geom_point(shape = 1) +
+  geom_smooth(method=lm)+
+  labs(x="Perceived IOS",
+       y="Percent of Emergence Traits")
+print(emergIOS.sctr)
+
+```
+Visualizing the relationship between participants' length of knowing the other couple, and frequency of emergence ratings. This was also a nonsignificant relationship.
+```{r}
+emergreldur.sctr <- ggplot(full, aes(x=selcoupreldur, y = emergence.perc)) +
+  geom_point(shape = 1) +
+  geom_smooth(method=lm)+
+  labs(x="Duration of Knowing Other Couple",
+       y="Percent of Emergence Traits")
+print(emergreldur.sctr)
+```
+
+The two plots that are key to the project hypotheses are the overlapping histogram, and the plot of confidence intervals. Save these to PDF files.
+```{r saving to file, include=FALSE}
+grid.arrange(overlaphist, CIplot, newpage = TRUE)
+plots <- arrangeGrob(overlaphist, CIplot, nrow=2)
+ggsave("plots.pdf", plots)
+```

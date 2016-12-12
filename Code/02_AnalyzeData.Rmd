@@ -1,0 +1,125 @@
+---
+title: "Analyze Data"
+author: "Amanda"
+date: "December 10, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load required packages
+```{r}
+require(stats)
+require(xlsx)
+require(Hmisc)
+require(dplyr)
+```
+
+#Exploratory Analyses
+```{r}
+corrmat <- rcorr(as.matrix(full[c("emerg", "oppo", "like", "coupreldur",
+                                  "selcoupreldur", "Oth1reldur", "Oth2reldur", "coupIOS")]), 
+                 type="pearson")
+#Write the correlation matrix to the excel file for later reference
+write.xlsx(round(corrmat$r,2), file="OthCoup_DragDrop_results.xlsx", sheetName="Corr")
+write.xlsx(round(corrmat$P,2), file="OthCoup_DragDrop_results.xlsx", sheetName="Corr p values", append=T)
+```
+
+#Parametric (regression) Analyses
+Note: these regression analyses are also somewhat exploratory, because we did not have any a priori hypotheses about how or whether demographic variables and/or background relationship-related variables (like closeness or relationship length) would influence participants' trait ratings. However, just to cover our bases, these regressions will test for various associations.
+
+## First: are there gender differences in the frequencies of the 3 different rating types? Note that we will first need to re-code the gender variable by turning the numbers into string factors. 0= male; 1=female; 2= NA
+```{r}
+full <- full%>%
+  mutate(Gen=replace(Gen,Gen==0, "Male"))
+full <- full%>%
+  mutate(Gen=replace(Gen,Gen==1, "Female"))
+full <- full%>%
+  mutate(Gen=replace(Gen,Gen==2, NA))
+
+full$Gen <- as.factor(full$Gen)
+
+#Regression model for gender predicting emergence ratings
+summary(lm(emerg ~ Gen, data = full))
+
+#Regression model for gender predicting likes-attract ratings
+summary(lm(like ~ Gen, data = full))
+
+#Regression model for gender predicting opposites-attract ratings
+summary(lm(oppo ~ Gen, data = full))
+```
+There are no significant gender differences in ratings for any of the three different types.
+
+##Second: what about combined effects of IOS and relationship duration? IOS is a measure of participants' perceived closeness between the two couple members -- in other words, observer-rated relationship closeness. We saw in the correlation table that the zero-order bivariate correlations are small and nonsignificant, but let's look at a regression model that includes both IOS and participants' duration of knowing the other couple.
+```{r}
+#Multivariate regression model predicting emergence ratings
+summary(lm(emerg ~ coupIOS + selcoupreldur, data = full))
+
+#Multivariate regression model predicting likes-attract ratings
+summary(lm(like ~ coupIOS + selcoupreldur, data = full))
+
+#Multivariate regression model predicting oppo-attract ratings
+summary(lm(oppo ~ coupIOS + selcoupreldur, data = full))
+```
+
+
+#Bootstrap Analyses
+Now to test the key hypotheses, which we will do with bootstrap resampling. Specifically, we want to know whether the frequency of perceiving "emergent" traits at the couple/dyadic level is more than just a fluke; statistically, this should manifest in the frequency of emergence ratings being significantly greater than 0. In order to obtain p-values or confidence intervals for this question, we need to estimate the variance, and to do this, we employ bootstrapping methods.  
+
+The first step in bootstrap analysis is to resample from the original data. (Here, we resample with replacement)
+```{r}
+sixfreqs.samp <- function(sixfreqs){
+  samp <- sixfreqs[sample(1:nrow(sixfreqs), replace = TRUE),]
+  return(samp)
+}
+```
+
+Draw bootstrap samples to look at confidence intervals for the 3 different types of ratings. First, define how many bootstrap samples to draw (B), then initialize three empty vectors that will hold the resampled data, one vector for each type.
+```{r}
+B <- 10000
+emergfreqs.boot <- numeric(B)
+oppattrfreqs.boot <- numeric(B)
+likattrfreqs.boot <- numeric(B)
+
+#Resampling B times, and compute the mean frequency each time:
+for(i in 1:B){
+  sixfreqs.dat <- as.data.frame(sixfreqs.samp(sixfreqs))
+  emergfreqs.boot[i] <- mean(sixfreqs.dat$freq.ind0coup1+sixfreqs.dat$freq.ind1coup0)
+  oppattrfreqs.boot[i] <- mean(sixfreqs.dat$freq.inddiffcoup0+sixfreqs.dat$freq.inddiffcoup1)
+  likattrfreqs.boot[i] <- mean(sixfreqs.dat$freq.all0+sixfreqs.dat$freq.all1)
+}
+```
+
+Visualize the bootstrap distributions of each type with summary data and histograms:
+```{r}
+#For the emergence type:
+summary(emergfreqs.boot)
+hist(emergfreqs.boot)
+mean(emergfreqs.boot)
+sd(emergfreqs.boot)
+
+#For the opposites-attract type:
+summary(oppattrfreqs.boot)
+hist(oppattrfreqs.boot)
+mean(oppattrfreqs.boot)
+sd(oppattrfreqs.boot)
+
+#For the likes-attract type:
+summary(likattrfreqs.boot)
+hist(likattrfreqs.boot)
+mean(likattrfreqs.boot)
+sd(likattrfreqs.boot)
+```
+
+The main goal of this bootstrap procedure was to obtain estimates of variance and standard deviation around the mean of the frequencies of each combination type. Then we can use those estimates to create 95% confidence intervals around each mean. Let's see what these confidence intervals are!
+```{r}
+#95% percentile interval for emergence
+quantile(emergfreqs.boot, c(0.025, 0.975))
+
+#95% percentile interval for opposites attract
+quantile(oppattrfreqs.boot, c(0.025, 0.975))
+
+#95% percentile interval for likes attract
+quantile(likattrfreqs.boot, c(0.025, 0.975))
+```

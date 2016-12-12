@@ -1,0 +1,214 @@
+---
+title: "01_CleanData"
+author: "Amanda"
+date: "December 10, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+First load all libraries/packages that will be necessary throughout this script
+```{r}
+require(dplyr)
+require(tidyr)
+require(ggplot2)
+library(gridExtra)
+require(stats)
+require(xlsx)
+require(Hmisc)
+```
+
+Set working directory
+```{r}
+setwd(dir="/Users/Amanda/Desktop/PS239T/PS239T/ps239T-final-project")
+```
+
+Load data from the CSV file into R. Note that this data file has been stripped of MTurk IDs and participant location information in order to protect confidentiality and remain in compliance with CPHS protocol.
+```{r}
+rawdata <- read.csv(file="OthCoup_DragDrop_bothbatches.csv", stringsAsFactors=F)
+dim(rawdata)[1] #Extract total number of rows, which roughly corresponds to number of participants. However, some of these are my own survey previews, and one row is a "junk" row that only contains variable labels.
+```
+
+Get rid of rows containing survey preview and variable labels (second row). Also, this study contained attention checks that we (a priori) deemed as determinants for exclusion from data analysis, so the following filter() function will filter out participants who failed this attention check item.
+```{r}
+culled <- slice(rawdata, 3:nrow(rawdata))
+culled <- filter(culled, culled$AttChk1=="1")
+
+```
+
+Compute subject ID numbers sequentially, starting from 1.
+```{r}
+culled$subj <- as.numeric(1:nrow(culled))
+```
+
+Create new, separate dataframes that contain specific subsets of the data: one for demographic and background data, and another for trait ratings. The trait ratings dataset should also exclude the ranking variables, which Qualtrics automatically collects as part of the drag-and-drop question item, but which are not relevant in this project.
+```{r}
+bckgd <- select(culled, coupreldur_1:Race, subj)      #demographics and background variables
+ratings <- select(culled, ends_with("Group"), subj)   #trait ratings, excluding rank data
+```
+
+Rename the variables. 
+First, this will require that we make a list of the traits with index numbers corresponding to order by which they appear in the survey. This list of the 27 traits is repeated 3 times in the new vector because participants did the same trait rating 3 times in a row (once for each of the three targets). Note also that each trait is only 5 characters long, which is important for later processing of these variables.
+```{r}
+traits <- c("extro", "intel", "indep", "energ", "funny", "accom", "argum", "attra", 
+            "intro", "serio", "cling", "affec", "imbal", "wild", "relig", "healt", "athle", 
+            "impul", "artis", "adven", "modes", "assert", "conve", "neuro", "likea", "ambit", 
+            "domin", "extro", "intel", "indep", "energ", "funny", "accom", "argum", "attra", 
+            "intro", "serio", "cling", "affec", "imbal", "wild", "relig", "healt", "athle", 
+            "impul", "artis", "adven", "modes", "assert", "conve", "neuro", "likea", "ambit", 
+            "domin", "extro", "intel", "indep", "energ", "funny", "accom", "argum", "attra", 
+            "intro", "serio", "cling", "affec", "imbal", "wild", "relig", "healt", "athle", 
+            "impul", "artis", "adven", "modes", "assert", "conve", "neuro", "likea", "ambit", 
+            "domin")
+```
+This code renames all the trait rating variables. 
+```{r}
+names(ratings) <- gsub('dragdropcouple_', 'coup', 
+                       gsub('dragdropoth1_', 'othA', 
+                            gsub('dragdropoth2_', 'othB', names(ratings))))
+```
+Now the column names denote the target (coup, othA, or othB), followed by a number indicating which trait the rating is for, and appended with "_Group", which is extraneous and we want to delete. The following for-loop thus operates across rows to paste in the trait vector from above. Each item in the trait list will be pasted to the front of the variable name. All column names will now be in the format of '[trait]+[target]'.
+```{r}
+for (i in 1:81) {
+  names(ratings)[i] <- paste(traits[i], substr(names(ratings)[i], start=1, stop = 4), sep = "")
+}
+```
+
+Sort the columns alphabetically, and move the 'subj' column to the front
+```{r}
+ratings <- ratings[,order(colnames(ratings))]
+ratings <- select(ratings, subj, everything())
+ratings[, c(2:82)] <- sapply(ratings[, c(2:82)], as.numeric)
+```
+
+Now the ratings dataframe is a series of 0s and 1s, organized alphabetically by trait but in sets of three (one column per target for each of the 27 traits). However, we're interested in the specific combinations of the three ratings for each separate trait. This means we need to label the rating combinations and then, for each person (row), calculate the frequencies of each type of combination.  
+
+These are all the possible combinations of trait ratings, and we are interested in the "emergence" type:  
+
+
+Combination | What this means | Label | Type
+------------- | ------------- | ------ | -------
+0, 1, 1 | couple yes, otherA no, otherB no | ind1coup0 | __"Emergence"__
+0, 1, 0 | couple yes, otherA no, otherB yes | inddiffcoup0 | "opposites attract"
+0, 0, 1 | couple yes, otherA yes, otherB no | inddiffcoup0 | "opposites attract"
+0, 0, 0 | all three targets yes | all0 | "likes attract"
+1, 1, 1 | all three targets no | all1 | "likes attract"
+1, 0, 0 | couple no, otherA yes, otherB yes | ind0coup1 | __"Emergence"__
+1, 1, 0 | couple no, otherA no, other2 yes | inddiffcoup1 | "opposites attract"
+1, 0, 1 | couple no, otherA yes, other2 no | inddiffcoup1 | "opposites attract"
+
+There are six different possibilities in the "Label" column in the table above (because otherA and otherB are indistinguishable from each other). So, the following R function will compute a specific number corresponding to each of these six different possibilities.
+```{r}
+labelfreq <- function(traitset){
+  out <- 5*traitset[1] + (traitset[2]+traitset[3])
+  return(out)
+}
+```
+
+Note, however, that we need this function to loop over every __three__ columns, since trait ratings are in sets of three (one column per target). So we need to write a function that essentially runs a for-loop by operating over every such-and-such number of rows. The following function will apply 'fun' to object 'x' over every 'by' columns. (Alternatively, 'by' may be a vector of groups).
+```{r}
+byapply <- function(x, by, fun, ...)
+{
+  # Create index list
+  if (length(by) == 1)
+  {
+    nc <- ncol(x)
+    split.index <- rep(1:ceiling(nc / by), each = by, length.out = nc)
+  } else # 'by' is a vector of groups
+  {
+    nc <- length(by)
+    split.index <- by
+  }
+  index.list <- split(seq(from = 1, to = nc), split.index)
+  
+  # Pass index list to fun using sapply() and return object
+  sapply(index.list, function(i)
+  {
+    do.call(fun, list(x[, i], ...))
+  })
+}
+```
+
+Now we can call on labelfreq to classify the rating combinations by feeding it into byapply. But first, subset the data so it **only** contains rating columns -- i.e., remove subject id numbers so that the functions can loop over only the ratings data.
+```{r}
+ratingstemp <- (select(ratings, -subj))
+```
+
+Now run the two functions and save the results in ratings.agg. In this new dataframe, every participant has 27 columns, one corresponding to each trait, and the data are numbers corresponding to the combination type. 
+```{r}
+ratings.agg <- byapply(ratingstemp, 3, labelfreq)
+# ratings.agg is a list; we need to turn it into a dataframe
+ratings.agg.df <- data.frame(matrix(unlist(ratings.agg), nrow=161, byrow=T))
+```
+Now compute the frequencies for each of the 6 combination types, and append those frequencies to the end of a new dataframe, ratings.agg.df.freqs:
+```{r}
+ratings.agg.df.freqs <- ratings.agg.df %>% 
+          mutate(freq.all0 = rowSums(. == 0),
+                 freq.all1 = rowSums(. == 7),
+                 freq.ind1coup0 = rowSums(. == 2),
+                 freq.ind0coup1 = rowSums(. == 5),
+                 freq.inddiffcoup0 = rowSums(. == 1),
+                 freq.inddiffcoup1 = rowSums(. == 6))
+```
+
+Compute subject numbers in ratings.agg.df.freqs so that it can be linked by ID number to the demographic/background data. 
+```{r}
+ratings.agg.df.freqs$subj <- as.numeric(1:nrow(ratings.agg.df.freqs))
+```
+
+Create a subsetted dataframe that only contains the 6 frequency counts (and subj ID for later linking)
+```{r}
+sixfreqs <- data.frame(select(ratings.agg.df.freqs, freq.all0:subj))
+```
+
+Further reduce the frequency types into 3 categories: emergence, likes attract, and opposites attract
+```{r}
+freqs <- sixfreqs %>%
+  mutate(emerg = freq.ind0coup1 + freq.ind1coup0,
+         like = freq.all0 + freq.all1,
+         oppo = freq.inddiffcoup1 + freq.inddiffcoup0)
+```
+
+
+```{r}
+#For good measure, save this dataframe into a xlsx for later reference
+write.xlsx(freqs, file="OthCoup_DragDrop_culleddata.xlsx", sheetName="freqs")
+```
+
+Merge the ratings data with the demographic/background data.
+```{r}
+full <- full_join(bckgd,freqs,by="subj")
+```
+
+All questions assessing relationship length (total of 4) were split into years and months, resulting in two separate data columns as downloaded from Qualtrics. Use the dplyr transmute() function to recompute these variables.
+```{r}
+#Subset the full dataframe to extract the relationship duration variables
+reldur <- full %>%
+  select(ends_with("reldur_1"),
+         ends_with("reldur_2"))
+
+#Check column classes
+sapply(reldur, class)
+
+#Convert to numeric 
+reldur <- reldur %>%
+  mutate_each(funs(as.numeric(.)))
+
+#Compute years and round to 2 decimal places
+reldur <- reldur %>% 
+  transmute(coupreldur = round(coupreldur_1 + (coupreldur_2/12), digits=2),
+            selcoupreldur = round(selcoupreldur_1 + (selcoupreldur_2/12), digits=2),
+            Oth1reldur = round(Oth1reldur_1 + (Oth1reldur_2/12), digits=2),
+            Oth2reldur = round(Oth2reldur_1+ (Oth2reldur_2/12), digits=2))
+
+#Append relationship length variables to the end of the 'full' dataframe
+full <- cbind(full, reldur)
+```
+
+Lastly, IOS (closeness) may be an important predictor or control variable, so the last step of data cleaning is to convert this to numeric type.
+```{r}
+full$coupIOS <- as.numeric(full$coupIOS)
+```
+
