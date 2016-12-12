@@ -1,5 +1,4 @@
-# Amanda Wang
-# ps239T-final-project
+# Amanda Wang       ps239T-final-project
 
 ## Short Description
   The code in this project repo begins with a CSV file containing raw data from a Qualtrics survey, which participants from Amazon's Mechanical Turk completed. A total of 209 responses were collected. Broadly, the survey asked that participants think of a romantic couple they know well, and to name the individuals within that couple. From there, participants provided three sets of personality trait ratings, one set for each target: individual A, individual B, and the couple as a unit. Each set consisted of 27 traits that participants rated as either describing the target (0) or not describing the target (1). 

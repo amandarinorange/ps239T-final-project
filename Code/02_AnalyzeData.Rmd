@@ -4,7 +4,8 @@ author: "Amanda"
 date: "December 10, 2016"
 output: html_document
 ---
-
+#Brief Description:
+This script file begins with exploratory analyses of the data, including correlations and regressions. Then, turning to the key hypotheses, it employs statistical resampling procedures to obtain significance statistics regarding each frequency type. Specifically, the code performs bootstrap analyses that sample from the original data 10,000 times, and then creates 95% confidence intervals around the mean of each frequency type. The main goal is to show that the frequencies of the rating type that we are interested in (i.e., emergence -- the rating type that corresponds to the couple being viewed differently from the individual couple members) is significantly non-zero. 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```

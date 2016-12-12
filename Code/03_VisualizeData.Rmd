@@ -4,7 +4,8 @@ author: "Amanda"
 date: "12/11/2016"
 output: html_document
 ---
-
+#Brief Description:  
+This script file produces univariate plots that visualize the frequencies of each rating type, as well as bivariate plots to visualize regression analyses and correlations among variables of interest. This also produces a plot of 95% confidence intervals around the mean for each of the three trait rating types. Finally, it exports the key plots to a PDF file.
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -21,7 +22,9 @@ require(Hmisc)
 #Univariate Plots
 First, we will want to visualize the frequencies of each of the three different types of ratings with three separate histograms. It may be more useful to view this as a percentage of total traits (that is, out of 27). 
 ```{r}
-#This plots a histogram for the percent of traits (total of 27) on which participants rated that the individual couple members are the SAME on a trait, but the couple is the opposite of what they are as individuals.
+#This plots a histogram for the percent of traits (total of 27) 
+#on which participants rated that the individual couple members are 
+#the SAME on a trait, but the couple is the opposite of what they are as individuals.
 emergence.perc <- 100*(full$emerg)/27 #calculate the percentage
 emergence.hist <- ggplot(full, aes(emergence.perc)) + 
   geom_histogram(binwidth = 4,
@@ -33,7 +36,8 @@ emergence.hist <- ggplot(full, aes(emergence.perc)) +
 
 emergence.hist
 
-#This plots a histogram for the percent of traits (total of 27) on which participants rated that the individual couple members are opposites on a trait
+#This plots a histogram for the percent of traits (total of 27) 
+#on which participants rated that the individual couple members are opposites on a trait
 oppattract.perc <- 100*(full$oppo)/27 #calculate the percentage
 oppattract.hist <- ggplot(full, aes(oppattract.perc)) + 
   geom_histogram(binwidth = 4,
@@ -46,6 +50,9 @@ y="Frequency")
   
 oppattract.hist
 
+#This plots a histogram for the percent of traits (total of 27) 
+#on which participants rated that the individual couple members are the same on a trait,
+#and the couple as unit also is the same as the individuals on that trait
 likattract.perc <- 100*(full$like)/27 #calculate the percentage
 likattract.hist <- ggplot(full, aes(likattract.perc)) + 
   geom_histogram(binwidth = 4,

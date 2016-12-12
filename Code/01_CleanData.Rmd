@@ -4,7 +4,8 @@ author: "Amanda"
 date: "December 10, 2016"
 output: html_document
 ---
-
+#Brief Description: 
+Broadly, this file contains code for cleaning the raw data. First, it loads a CSV file containing raw data from a Qualtrics survey, which participants from Amazon's Mechanical Turk completed. Then, in further data-processing, it cleans the data into an analyzable format through user-defined functions that labeling the eight different types of trait rating combinations for each of the 27 traits. Then, it computes frequencies for the types of trait rating combinations that are of interest to the research project as a whole (a total of 3 "types", reduced from the original 8 possibilities). Finally, the script merges the frequencies of trait ratings with the background and demographic variables.
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -28,7 +29,9 @@ setwd(dir="/Users/Amanda/Desktop/PS239T/PS239T/ps239T-final-project")
 Load data from the CSV file into R. Note that this data file has been stripped of MTurk IDs and participant location information in order to protect confidentiality and remain in compliance with CPHS protocol.
 ```{r}
 rawdata <- read.csv(file="OthCoup_DragDrop_bothbatches.csv", stringsAsFactors=F)
-dim(rawdata)[1] #Extract total number of rows, which roughly corresponds to number of participants. However, some of these are my own survey previews, and one row is a "junk" row that only contains variable labels.
+dim(rawdata)[1] #Extract total number of rows, which roughly corresponds to number of participants. 
+#However, some of these are my own survey previews, and one row is a "junk" row that 
+#only contains variable labels.
 ```
 
 Get rid of rows containing survey preview and variable labels (second row). Also, this study contained attention checks that we (a priori) deemed as determinants for exclusion from data analysis, so the following filter() function will filter out participants who failed this attention check item.
@@ -203,7 +206,7 @@ reldur <- reldur %>%
             Oth1reldur = round(Oth1reldur_1 + (Oth1reldur_2/12), digits=2),
             Oth2reldur = round(Oth2reldur_1+ (Oth2reldur_2/12), digits=2))
 
-#Append relationship length variables to the end of the 'full' dataframe
+#Append relationship length variables to end of the 'full' dataframe
 full <- cbind(full, reldur)
 ```
 
